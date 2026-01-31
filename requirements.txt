@@ -1,3 +1,5 @@
+numpy
+pretty_midi
 torch
-os
-sys
+torchaudio
+
