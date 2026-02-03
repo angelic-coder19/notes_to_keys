@@ -120,7 +120,7 @@ def midi_to_frame_labels(notes, num_frames):
 def find_pairs(root):
     """
     Walks through the MAESTRO dataset and finds matching
-    .wav and .midi files based on filename.
+    .wav and .midi files based on the filename.
     """
     pairs = []
 
