@@ -12,9 +12,9 @@ from torchaudio.transforms import MelSpectrogram, AmplitudeToDB
 # ============================================================
 
 SAMPLE_RATE = 16000  # How number of audio samples per second
-N_MELS = 229         # Matches Onsets & Frames
-HOP_LENGTH = 512     # ~32ms hop at 16kHz
-N_FFT = 2048         # Good balance for piano harmonics
+N_MELS = 229         # How many frequency bands the Mel spectrogram compresses the audio into
+HOP_LENGTH = 512     # How many audio smaples you "jump" between each spectogram
+N_FFT = 2048         # Size of Fourier Transform window for spectrogram
 
 DATASET_ROOT = "maestro\maestro-v3.0.0\maestro-v3.0.0"
 OUTPUT_ROOT = "processed"
