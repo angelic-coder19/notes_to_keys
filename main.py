@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 
-# Global normalization constants (compute these from your training set)
+# Global normalization constants for CQT (estimated from dataset)
 GLOBAL_MEAN = -40.0  # dB
 GLOBAL_STD = 20.0    # dB
 
