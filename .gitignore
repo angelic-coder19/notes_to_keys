@@ -1,4 +1,5 @@
-maestro/
+maestro-v3.0.0/
+processed/
 processed_chunks/
 venv/
 torch-2.5.1+cpu-cp312-cp312-win_amd64.whl
