@@ -346,6 +346,37 @@ def load_dataset(dataset_path, chunk_length=100, hop_length=50, max_files=None):
     
     return X, y_onset, y_frame
 
+def load_dataset_incremental(dataset_path, output_dir='processed_chunks'):
+    """
+    Load and preprocess the MAESTRO dataset incrementally, saving chunks to disk.
+    
+    Args:
+        dataset_path: Path to maestro-v3.0.0 folder
+        output_dir: Directory to save processed chunk files
+    Returns:
+        chunk_index: List of file paths to saved chunk files
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(exist_ok=True)
+
+    chunk_idx = 0
+    for year_dir in year_dirs:
+        for wav_path in wav_files:
+            # Process this file
+            cqt_chunks, onset_chunks, frame_chunks = process_file(
+
+            )
+
+            for i in range(len(cqt_chunks)):
+                np.savez_compressed(
+                    output_dir / f'chunk_{chunk_idx:06d}.npz',
+                    cqt=cqt_chunks[i],
+                    onset=onset_chunks[i],
+                    frame=frame_chunks[i]
+                )
+                chunk_idx += 1
+    
+    return chunk_idx  # Return total number of chunks saved
 
 if __name__ == "__main__":
     main()

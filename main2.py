@@ -413,11 +413,20 @@ def process_file(
         Tuple of (cqt_chunks, onset_chunks, frame_chunks)
     """
     try:
-        # Get CQT and piano rolls
+        # Get CQT to determine target frame count
         cqt = get_piano_cqt(audio_path, config)
-        onset_roll, frame_roll = get_piano_roll(midi_path, config)
-        
-        # Align dimensions
+        target_frames = cqt.shape[2]    # THIS is ground truth
+
+        # Get piano rolls matched to CQT frames
+        onset_roll, frame_roll = get_piano_roll_exact_alignment(
+            midi_path,
+            target_frames=target_frames,
+            hop_length=config.hop_length,
+            sr=config.sample_rate
+        )
+
+        # Verify
+        assert cqt.shape[2] == onset_roll.shape[0] == frame_roll.shape[0], f"Alignment failed: CQT={cqt.shape[2]}, onset={onset_roll.shape[0]}, frame={frame_roll.shape[0]}"
         cqt, onset_roll, frame_roll = align_dimensions(cqt, onset_roll, frame_roll)
         
         # Validate before chunking
@@ -434,8 +443,11 @@ def process_file(
         
         return chunks
         
+    except AssertionError as e:
+        logger.error(f"Alignment assertion failed for {audio_path}: {e}")
+        return [], [], []
     except Exception as e:
-        logger.error(f"Error processing {audio_path}: {e}", exc_info=True)
+        logger.error(f"Failed to process file {audio_path}: {e}", exc_info=True)
         return [], [], []
 
 # ============================================================================
