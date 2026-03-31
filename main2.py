@@ -361,6 +361,50 @@ def align_dimensions(
     
     return cqt, onset_roll, frame_roll
 
+def process_single_folder(dataset_path, year_folder, output_dir):
+    """
+    Process just one year folder to avoid memory issues.
+    
+    Args:
+        dataset_path: Path to maestro-v3.0.0
+        year_folder: e.g., '2006'
+        output_dir: Where to save chunks
+    """
+    year_path = Path(dataset_path) / year_folder
+    
+    if not year_path.exists():
+        print(f"Folder {year_folder} not found!")
+        return
+    
+    output_path = Path(output_dir) / year_folder
+    output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Process just this folder
+    load_dataset_incremental(
+        str(year_path),
+        output_dir=str(output_path),
+        resume=False
+    )
+    
+    print(f"✅ Completed processing {year_folder}")
+
+# Usage:
+if __name__ == "__main__":
+    dataset_path = "maestro-v3.0.0"
+    
+    # Process each year separately
+    for year in ['2004', '2006', '2008', '2009', '2011', 
+                 '2013', '2014', '2015', '2017', '2018']:
+        print(f"\n{'='*60}")
+        print(f"Processing {year}")
+        print('='*60)
+        
+        process_single_folder(
+            dataset_path, 
+            year, 
+            output_dir='processed_chunks'
+        )
+
 def chunk_data(
     cqt: np.ndarray,
     onset_roll: np.ndarray,
