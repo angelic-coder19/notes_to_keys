@@ -388,22 +388,6 @@ def process_single_folder(dataset_path, year_folder, output_dir):
     
     print(f"✅ Completed processing {year_folder}")
 
-# Usage:
-if __name__ == "__main__":
-    dataset_path = "maestro-v3.0.0"
-    
-    # Process each year separately
-    for year in ['2004', '2006', '2008', '2009', '2011', 
-                 '2013', '2014', '2015', '2017', '2018']:
-        print(f"\n{'='*60}")
-        print(f"Processing {year}")
-        print('='*60)
-        
-        process_single_folder(
-            dataset_path, 
-            year, 
-            output_dir='processed_chunks'
-        )
 
 def chunk_data(
     cqt: np.ndarray,
@@ -550,21 +534,19 @@ class ProcessingMetadata:
 def find_audio_midi_pairs(dataset_path: Path) -> List[Tuple[Path, Path]]:
     """
     Find all valid audio-MIDI pairs in dataset.
-    
-    Args:
-        dataset_path: Root directory of MAESTRO dataset
-    
-    Returns:
-        List of (audio_path, midi_path) tuples
+    Handles both flat (single year) and nested (full dataset) structures.
     """
     pairs = []
     
-    # Find all year subdirectories
-    year_dirs = sorted([d for d in dataset_path.iterdir() if d.is_dir()])
+    # Check if WAV files are directly in this folder (single-year / flat mode)
+    if any(dataset_path.glob('*.wav')):
+        search_dirs = [dataset_path]
+    else:
+        # Full dataset: look inside year subdirectories
+        search_dirs = sorted([d for d in dataset_path.iterdir() if d.is_dir()])
     
-    for year_dir in year_dirs:
-        for wav_path in year_dir.glob('*.wav'):
-            # Try both .midi and .mid extensions
+    for search_dir in search_dirs:
+        for wav_path in search_dir.glob('*.wav'):
             midi_path = wav_path.with_suffix('.midi')
             if not midi_path.exists():
                 midi_path = wav_path.with_suffix('.mid')
@@ -859,5 +841,23 @@ def main():
     
     logger.info("✅ Processing complete!")
 
+"""if __name__ == "__main__":
+    main()"""
+
+# Usage:
 if __name__ == "__main__":
-    main()
+    dataset_path = "maestro-v3.0.0"
+    
+    # Process each year separately
+    for year in ['2004', '2006', '2008', '2009', '2011', 
+                 '2013', '2014', '2015', '2017', '2018']:
+        print(f"\n{'='*60}")
+        print(f"Processing {year}")
+        print('='*60)
+        
+        process_single_folder(
+            dataset_path, 
+            year, 
+            output_dir='processed_chunks'
+        )
+    
