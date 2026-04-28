@@ -17,3 +17,4 @@ Thumbs.db
 node_modules/
 frontend/dist/
 *.wav
+preprocessing/consolidated/
