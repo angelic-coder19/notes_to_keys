@@ -2,32 +2,19 @@
 app.py
 Notes to Keys — Flask Inference Server (Option A)
 
-In production (Hugging Face Spaces), Flask serves both:
-  - The React frontend from frontend/dist/
-  - The inference API routes (/transcribe, /health, /model-info)
-
 Routes:
     POST /transcribe    — accepts audio file, returns transcription JSON
+    GET  /sample        — serves the built-in demo WAV file
     GET  /health        — confirms server is running
     GET  /model-info    — returns config the frontend needs
-    GET  /*             — serves the React SPA (index.html + static assets)
-
-Usage (development):
-    python app.py
-    React dev server runs separately on http://localhost:5173
-    Vite proxies /transcribe, /health, /model-info to this server.
-
-Usage (production / Hugging Face Spaces):
-    Build React first:  cd frontend && npm run build
-    Then:               python app.py
-    Everything served from http://localhost:7860
+    GET  /*             — serves the React SPA
 """
 
 import os
 import tempfile
 import traceback
 from pathlib import Path
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 
 from inference import TranscriptionPipeline, PREPROC_CFG
@@ -39,27 +26,20 @@ from model_utils import MODEL_CFG
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'best_model.pth')
 
-# Path to the built React app.
-# - Local dev (backend/ folder):       ../frontend/dist
-# - Hugging Face Spaces (flat layout):  ./frontend/dist
-# Override via FRONTEND_DIST env variable if your layout differs.
-_default_dist = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
-FRONTEND_DIST = os.environ.get('FRONTEND_DIST', _default_dist)
+_default_dist  = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
+FRONTEND_DIST  = os.environ.get('FRONTEND_DIST', _default_dist)
 
-# Maximum upload size: 50 MB
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+# The demo sample WAV — place a short piano recording named sample.wav
+# in the same folder as app.py (the backend/ folder / container root).
+SAMPLE_PATH = os.path.join(os.path.dirname(__file__), 'sample.wav')
 
-# Accepted audio extensions
+MAX_UPLOAD_BYTES   = 50 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.wav', '.mp3', '.flac', '.ogg', '.m4a'}
 
-# CORS — allow Vite dev server during local development.
-# In production (Option A), everything is same-origin so CORS is not needed,
-# but keeping it here does no harm and eases local development.
 CORS_ORIGINS = [
     'http://localhost:5173',
     'http://localhost:3000',
     'http://127.0.0.1:5173',
-    # 'https://your-space.hf.space',  ← add when deployed if needed
 ]
 
 # ============================================================================
@@ -77,6 +57,7 @@ print("  Notes to Keys — Inference Server")
 print("=" * 55)
 print(f"  Model path:    {MODEL_PATH}")
 print(f"  Frontend dist: {os.path.abspath(FRONTEND_DIST)}")
+print(f"  Sample file:   {SAMPLE_PATH} ({'found' if Path(SAMPLE_PATH).exists() else 'NOT FOUND — demo button will error'})")
 
 if not Path(MODEL_PATH).exists():
     raise FileNotFoundError(
@@ -108,16 +89,15 @@ def error_response(message: str, status_code: int):
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Confirm the server is running and the model is loaded."""
     return jsonify({
         'status': 'ok',
         'model':  Path(MODEL_PATH).name,
+        'sample': Path(SAMPLE_PATH).exists(),
     })
 
 
 @app.route('/model-info', methods=['GET'])
 def model_info():
-    """Return the configuration values the frontend needs."""
     return jsonify({
         'frame_duration_sec':     round(PREPROC_CFG['hop_length'] / PREPROC_CFG['sample_rate'], 6),
         'n_keys':                 MODEL_CFG['n_keys'],
@@ -132,14 +112,29 @@ def model_info():
     })
 
 
+@app.route('/sample', methods=['GET'])
+def sample():
+    """
+    Serve the built-in demo WAV file so users can try the app immediately.
+
+    To add the sample:
+      1. Pick a short piano recording (30–90 seconds works well).
+      2. Name it sample.wav.
+      3. Place it in the same folder as app.py (the backend/ folder).
+      4. Commit it to the Hugging Face Space repo (it's just a file — no LFS needed
+         for files under ~50 MB; use LFS if it's larger).
+    """
+    if not Path(SAMPLE_PATH).exists():
+        return error_response(
+            'Demo sample not found on the server. '
+            'Add a file named sample.wav to the backend folder.',
+            404
+        )
+    return send_file(SAMPLE_PATH, mimetype='audio/wav', as_attachment=False)
+
+
 @app.route('/transcribe', methods=['POST'])
 def transcribe():
-    """
-    Accept an audio file, run inference, return the transcription.
-
-    Request:  multipart/form-data, field name 'audio'
-    Response: JSON transcription result (see inference.py for schema)
-    """
     if 'audio' not in request.files:
         return error_response(
             'No audio file attached. '
@@ -193,26 +188,18 @@ def transcribe():
 
 
 # ============================================================================
-# FRONTEND — serve the React SPA (Option A)
+# FRONTEND — React SPA (Option A)
 # ============================================================================
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    """
-    Serve the built React app for any route not matched by the API routes above.
-
-    - Existing files in frontend/dist/ are served directly
-      (JS bundles, CSS, images, fonts).
-    - Everything else falls back to index.html so React handles the path.
-    """
-    dist = os.path.abspath(FRONTEND_DIST)
+    dist   = os.path.abspath(FRONTEND_DIST)
 
     if not os.path.isdir(dist):
         return (
             '<h2>Frontend not built.</h2>'
-            '<p>Run <code>cd frontend && npm run build</code> first, '
-            'or start the Vite dev server on port 5173.</p>',
+            '<p>Run <code>cd frontend && npm run build</code> first.</p>',
             404,
         )
 
@@ -224,15 +211,14 @@ def serve_frontend(path):
 
 
 # ============================================================================
-# LARGE FILE ERROR HANDLER
+# ERROR HANDLERS
 # ============================================================================
 
 @app.errorhandler(413)
 def file_too_large(e):
     limit_mb = MAX_UPLOAD_BYTES // (1024 * 1024)
     return error_response(
-        f'File exceeds the {limit_mb} MB upload limit. '
-        'Trim the audio before uploading.',
+        f'File exceeds the {limit_mb} MB upload limit.',
         413
     )
 
@@ -242,7 +228,5 @@ def file_too_large(e):
 # ============================================================================
 
 if __name__ == '__main__':
-    # Hugging Face Spaces expects port 7860.
-    # Local development uses 5000 (Vite proxies to this).
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
